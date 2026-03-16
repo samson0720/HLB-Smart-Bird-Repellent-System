@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<!--353864d7b2c16d2e1025b670d25062bc  Open weather api key-->
+<!--https://cors-anywhere.herokuapp.com/corsdemo -->
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>風力發電機鳥類偵測系統 - 監控儀表板</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        .status-dot {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-left: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connecting {
+            background-color: #fbbf24;
+            /* yellow */
+        }
+
+        .status-dot.online {
+            background-color: #10b981;
+            /* green */
+        }
+
+        .status-dot.offline {
+            background-color: #ef4444;
+            /* red */
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        /* 卡片懸停效果 */
+        .card-hover {
+            transition: all 0.3s ease;
+            background: white;
+            border: 1px solid #e5e7eb;
+        }
+
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.15);
+            border-color: #3b82f6;
+        }
+
+        /* 統計卡片動畫 */
+        .stat-card {
+            transition: all 0.3s ease;
+            background: white;
+            border: 1px solid #e5e7eb;
+        }
+
+        .stat-card:hover {
+            transform: scale(1.05);
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+        }
+
+        .stat-card:hover i,
+        .stat-card:hover p {
+            color: white !important;
+        }
+
+        /* 整體背景 - 白藍色系 */
+        body {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #dbeafe 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        /* 內容容器 */
+        .container {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #e5e7eb;
+            border-radius: 24px;
+            padding: 2.5rem;
+            margin: 2rem auto;
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.1);
+        }
+
+        /* 開關切換器樣式 */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.4s;
+            border-radius: 34px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.toggle-slider {
+            background-color: #22c55e;
+        }
+
+        input:checked+.toggle-slider:before {
+            transform: translateX(26px);
+        }
+
+        input:disabled+.toggle-slider {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* 標題樣式 */
+        header h1 {
+            color: #1e40af;
+        }
+
+        header p {
+            color: #64748b;
+        }
+
+        /* 自訂滾動條樣式 */
+        .overflow-y-auto::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .overflow-y-auto::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+
+        .overflow-y-auto::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 10px;
+        }
+
+        .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+            background: #2563eb;
+        }
+
+        /* 風扇狀態圖示動畫 */
+        @keyframes rotate {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .fan-spin {
+            animation: rotate 2s linear infinite;
+        }
+
+        .fan-pulse {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        /* 狀態指示器樣式 */
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            margin: 0 auto;
+            transition: all 0.3s ease;
+        }
+
+        .status-indicator.on {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+        }
+
+        .status-indicator.off {
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+            box-shadow: 0 0 20px rgba(107, 114, 128, 0.3);
+        }
+
+        /* 鳥類偵測狀態 */
+        .bird-detected {
+            animation: birdAlert 1s ease-in-out infinite;
+        }
+
+        @keyframes birdAlert {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 0.8;
+            }
+        }
+    </style>
+</head>
+
+<body class="min-h-screen">
+
+    <!-- 主容器 -->
+    <div class="container mx-auto px-4 py-8">
+
+        <!-- 主標題 -->
+        <header class="mb-10 relative">
+            <h1 class="text-5xl font-bold text-center mb-3">
+                <i class="fas fa-wind mr-3"></i>
+                風力發電機鳥類偵測系統
+            </h1>
+            <p class="text-center text-lg">IoT 網頁監控儀表板</p>
+
+            <!-- 設定按鈕 -->
+            <button id="settings-btn"
+                class="absolute top-0 right-0 p-2 text-gray-500 hover:text-blue-600 transition-colors">
+                <i class="fas fa-cog text-2xl"></i>
+            </button>
+        </header>
+
+        <!-- 三個主要區塊 (響應式網格佈局) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            <!-- 1. 即時狀態卡片 -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-fan text-blue-500 mr-3"></i>
+                    即時狀態
+                </h2>
+                <div class="mt-6">
+                    <p class="text-lg text-gray-700">
+                        目前狀態：
+                        <span id="fan-status" class="font-bold text-yellow-600">連線中...</span>
+                        <span id="status-dot" class="status-dot connecting"></span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- 2. 遠端控制卡片 -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-sliders-h text-green-500 mr-3"></i>
+                    遠端控制
+                </h2>
+
+                <!-- 風扇狀態圖示 -->
+                <div class="flex justify-center mb-6">
+                    <div id="fan-status-indicator" class="status-indicator on">
+                        <i id="fan-status-icon" class="fas fa-fan text-white text-2xl fan-spin"></i>
+                    </div>
+                </div>
+
+                <!-- 狀態文字顯示 -->
+                <div class="text-center mb-4">
+                    <p class="text-sm text-gray-500 mb-1">目前狀態</p>
+                    <p id="fan-state-text" class="text-2xl font-bold text-green-600">運轉中</p>
+                </div>
+
+                <!-- 風扇開關切換器 -->
+                <div class="mt-6">
+                    <p class="text-sm text-gray-600 font-medium mb-3 text-center">風扇開關控制</p>
+                    <div class="flex items-center justify-center space-x-4">
+                        <span class="text-gray-600 text-sm" id="fan-control-label">關閉</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="fan-toggle" class="sr-only peer" checked>
+                            <div
+                                class="w-16 h-9 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-7 after:w-7 after:transition-all peer-checked:bg-green-500">
+                            </div>
+                        </label>
+                        <span class="text-gray-600 text-sm" id="fan-control-label2">開啟</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- 3. 環境感知卡片 (取代原本的事件日誌位置，將日誌移到下方) -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-cloud-sun text-orange-500 mr-3"></i>
+                    環境感知
+                </h2>
+
+                <div id="weather-info" class="text-center">
+                    <div class="flex justify-center items-center mb-4">
+                        <img id="weather-icon" src="http://openweathermap.org/img/wn/01d@2x.png" alt="Weather Icon"
+                            class="w-20 h-20">
+                        <div class="text-left ml-2">
+                            <p id="weather-temp" class="text-3xl font-bold text-gray-800">--°C</p>
+                            <p id="weather-desc" class="text-gray-500">載入中...</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="bg-blue-50 p-3 rounded-lg">
+                            <p class="text-xs text-gray-500">風速</p>
+                            <p id="weather-wind" class="text-lg font-bold text-blue-600">-- m/s</p>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <p class="text-xs text-gray-500">決策建議</p>
+                            <p id="weather-advice" class="text-sm font-bold text-gray-700">--</p>
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-gray-400 text-right">Data by OpenWeatherMap</p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 事件日誌區域 (移至全寬) -->
+        <div class="mt-6 bg-white rounded-lg shadow-md p-6 card-hover">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-list-alt text-purple-500 mr-3"></i>
+                事件日誌
+            </h2>
+            <div class="mt-4 overflow-x-auto overflow-y-auto" style="max-height: 300px;">
+                <table class="min-w-full table-auto">
+                    <thead>
+                        <tr class="bg-gray-100 sticky top-0">
+                            <th class="px-4 py-2 text-left text-sm font-semibold text-gray-700">時間</th>
+                            <th class="px-4 py-2 text-left text-sm font-semibold text-gray-700">事件描述</th>
+                        </tr>
+                    </thead>
+                    <tbody id="log-table-body">
+                        <tr>
+                            <td colspan="2" class="px-4 py-3 text-center text-gray-500 italic">
+                                尚無事件
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Arduino 距離感測器連線設定 -->
+        <div class="mt-6 bg-white rounded-lg shadow-md p-6 card-hover">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-microchip text-blue-500 mr-3"></i>
+                Arduino 距離感測器連線
+            </h2>
+            <div class="flex items-center space-x-4 flex-wrap">
+                <div>
+                    <label class="text-sm text-gray-600 mr-2">Arduino IP 地址:</label>
+                    <input type="text" id="arduino-ip" placeholder="192.168.x.x"
+                        class="px-3 py-2 border border-gray-300 rounded text-sm">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-600 mr-2">更新間隔 (秒):</label>
+                    <input type="number" id="update-interval" value="1" min="0.5" max="10" step="0.5"
+                        class="px-3 py-2 border border-gray-300 rounded text-sm w-24">
+                </div>
+                <button id="connect-arduino-btn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                    <i class="fas fa-plug mr-2"></i>連線
+                </button>
+                <button id="disconnect-arduino-btn" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                    disabled>
+                    <i class="fas fa-unlink mr-2"></i>斷線
+                </button>
+                <div class="flex items-center">
+                    <span class="text-sm text-gray-600 mr-2">連線狀態:</span>
+                    <span id="arduino-status" class="text-sm font-bold text-yellow-600">未連線</span>
+                    <span id="arduino-status-dot" class="status-dot offline"></span>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">
+                💡 提示：請輸入 Arduino 的 IP 地址（可在 Serial Monitor 中查看），然後點擊連線開始接收距離數據
+            </p>
+            <div class="mt-3 p-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-200">
+                <p class="text-xs text-blue-800 font-semibold mb-1">🔍 連線步驟：</p>
+                <ol class="text-xs text-blue-700 list-decimal list-inside space-y-1">
+                    <li>先在瀏覽器中訪問 <code class="bg-blue-100 px-1 rounded">http://172.20.10.3</code> 確認 Arduino 可訪問</li>
+                    <li>確認電腦和 Arduino 連接到同一 WiFi（閘道應為 172.20.10.1）</li>
+                    <li>如果瀏覽器無法打開，執行 <code class="bg-blue-100 px-1 rounded">ping 172.20.10.3</code> 測試網路連線</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- 額外資訊區域 (全寬) -->
+        <div class="mt-6 bg-white rounded-lg shadow-md p-6 card-hover">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-info-circle text-indigo-500 mr-3"></i>
+                系統資訊
+            </h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                <div
+                    class="text-center p-6 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl stat-card border border-emerald-200">
+                    <div id="bird-status-container" class="flex flex-col items-center justify-center">
+                        <i class="fas fa-circle-check text-4xl text-emerald-500 mb-3"></i>
+                        <p class="text-sm text-gray-600 font-medium mb-1">鳥類偵測</p>
+                        <p id="bird-status" class="text-lg font-bold text-emerald-600">正常</p>
+                    </div>
+                </div>
+                <div
+                    class="text-center p-6 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl stat-card border border-blue-200">
+                    <i class="fas fa-ruler-horizontal text-4xl text-blue-500 mb-3"></i>
+                    <p class="text-sm text-gray-600 font-medium mb-1">鳥群預估距離</p>
+                    <p id="bird-distance" class="text-2xl font-bold text-blue-700">-- 公尺</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 設定模態框 (Modal) -->
+    <div id="settings-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">系統設定</h3>
+
+                <div class="space-y-4">
+                    <!-- OpenWeatherMap 設定 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">OpenWeatherMap API Key</label>
+                        <input type="text" id="weather-api-key"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="輸入 API Key">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">城市名稱 (City Name)</label>
+                        <input type="text" id="weather-city"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            placeholder="e.g., Taipei">
+                    </div>
+
+                    <hr class="border-gray-200">
+
+                    <!-- LINE Messaging API 設定 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">LINE Channel Access Token</label>
+                        <div class="flex gap-2">
+                            <input type="password" id="line-access-token"
+                                class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                placeholder="輸入 Channel Access Token">
+                            <button id="test-line-btn"
+                                class="bg-blue-500 text-white px-3 py-2 rounded-md text-sm hover:bg-blue-600 whitespace-nowrap">
+                                <i class="fas fa-paper-plane"></i> 測試
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">
+                            * 將透過 CORS Proxy 發送廣播訊息
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button id="close-settings-btn"
+                        class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                        取消
+                    </button>
+                    <button id="save-settings-btn"
+                        class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300">
+                        儲存
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MQTT.js 函式庫 CDN -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+    <!-- 主要 JavaScript 程式碼 -->
+    <script>
+        // ===== 全域變數 =====
+        let mqttClient = null;
+        let arduinoIP = '';
+        let arduinoPollInterval = null;
+        let isArduinoConnected = false;
+
+        const fanStatusElement = document.getElementById('fan-status');
+        const statusDotElement = document.getElementById('status-dot');
+        const fanToggle = document.getElementById('fan-toggle');
+        const logTableBody = document.getElementById('log-table-body');
+        const fanStatusIndicator = document.getElementById('fan-status-indicator');
+        const fanStatusIcon = document.getElementById('fan-status-icon');
+        const fanStateText = document.getElementById('fan-state-text');
+
+        // Arduino 相關元素
+        const arduinoIPInput = document.getElementById('arduino-ip');
+        const updateIntervalInput = document.getElementById('update-interval');
+        const connectArduinoBtn = document.getElementById('connect-arduino-btn');
+        const disconnectArduinoBtn = document.getElementById('disconnect-arduino-btn');
+        const arduinoStatus = document.getElementById('arduino-status');
+        const arduinoStatusDot = document.getElementById('arduino-status-dot');
+        const birdDistanceElement = document.getElementById('bird-distance');
+
+        // Pico 2W 連線相關
+        let picoIP = '';
+        let picoPollInterval = null;
+        let isPicoConnected = false;
+
+        // 用於錯誤記錄的靜態變數
+        let lastErrorTime = 0;
+
+        // 新增功能變數
+        let weatherApiKey = '';
+        let weatherCity = '';
+        let lineAccessToken = '';
+        let lastNotificationTime = 0;
+        let lastManualStopState = null; // 追蹤手動停機狀態
+        const NOTIFICATION_COOLDOWN = 10000; // 10秒內不重複發送通知
+
+        // 設定相關元素
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsModal = document.getElementById('settings-modal');
+        const closeSettingsBtn = document.getElementById('close-settings-btn');
+        const saveSettingsBtn = document.getElementById('save-settings-btn');
+        const weatherApiKeyInput = document.getElementById('weather-api-key');
+        const weatherCityInput = document.getElementById('weather-city');
+        const lineAccessTokenInput = document.getElementById('line-access-token');
+
+        // 天氣元素
+        const weatherTempEl = document.getElementById('weather-temp');
+        const weatherDescEl = document.getElementById('weather-desc');
+        const weatherWindEl = document.getElementById('weather-wind');
+        const weatherAdviceEl = document.getElementById('weather-advice');
+        const weatherIconEl = document.getElementById('weather-icon');
+
+        // ===== 輔助函式 =====
+
+        /**
+         * 更新狀態顯示
+         */
+        function updateStatus(status, statusClass) {
+            fanStatusElement.textContent = status;
+            statusDotElement.className = `status-dot ${statusClass}`;
+        }
+
+        /**
+         * 更新風扇視覺狀態
+         */
+        function updateFanVisualState(isOn) {
+            if (isOn) {
+                // 開啟狀態：綠色背景 + 旋轉圖示
+                fanStatusIndicator.className = 'status-indicator on';
+                fanStatusIcon.className = 'fas fa-fan text-white text-2xl fan-spin';
+                fanStateText.textContent = '運轉中';
+                fanStateText.className = 'text-2xl font-bold text-green-600';
+            } else {
+                // 關閉狀態：灰色背景 + 靜止圖示
+                fanStatusIndicator.className = 'status-indicator off';
+                fanStatusIcon.className = 'fas fa-fan text-white text-2xl';
+                fanStateText.textContent = '已停止';
+                fanStateText.className = 'text-2xl font-bold text-gray-500';
+            }
+        }
+
+        /**
+         * 更新鳥類偵測狀態
+         * level: 'red' (<30cm), 'yellow' (<50cm), 'green' (>=50cm)
+         */
+        function updateBirdStatus(level) {
+            const icon = document.querySelector('#bird-status-container i');
+            const statusText = document.getElementById('bird-status');
+            const container = document.getElementById('bird-status-container');
+
+            // 移除所有可能的狀態 class
+            container.classList.remove('bird-detected', 'bg-red-50', 'bg-yellow-50', 'bg-emerald-50', 'border-red-200', 'border-yellow-200', 'border-emerald-200');
+            icon.className = ''; // 重置 icon class
+
+            if (level === 'red') {
+                // 紅燈：危險 (< 45cm)
+                icon.className = 'fas fa-exclamation-triangle text-3xl text-red-500 mb-2 bird-detected';
+                statusText.textContent = '危險！入侵偵測';
+                statusText.className = 'text-sm font-semibold text-red-600';
+                container.classList.add('bird-detected', 'bg-red-50', 'border-red-200');
+            } else if (level === 'yellow') {
+                // 黃燈：警告 (< 60cm)
+                icon.className = 'fas fa-exclamation-circle text-3xl text-yellow-500 mb-2';
+                statusText.textContent = '警告！接近中';
+                statusText.className = 'text-sm font-semibold text-yellow-600';
+                container.classList.add('bg-yellow-50', 'border-yellow-200');
+            } else {
+                // 綠燈：正常 (>= 60cm)
+                icon.className = 'fas fa-circle-check text-4xl text-emerald-500 mb-3';
+                statusText.textContent = '正常';
+                statusText.className = 'text-lg font-bold text-emerald-600';
+                container.classList.add('bg-emerald-50', 'border-emerald-200');
+            }
+        }
+
+        /**
+         * 添加事件日誌
+         */
+        function addLogEntry(eventDescription) {
+            // 清除 "尚無事件" 提示
+            if (logTableBody.children.length === 1 &&
+                logTableBody.children[0].children[0].getAttribute('colspan') === '2') {
+                logTableBody.innerHTML = '';
+            }
+
+            const now = new Date();
+            const timeString = now.toLocaleString('zh-TW', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+
+            const row = document.createElement('tr');
+            row.className = 'border-t hover:bg-gray-50';
+            row.innerHTML = `
+                <td class="px-4 py-2 text-sm text-gray-600">${timeString}</td>
+                <td class="px-4 py-2 text-sm text-gray-800">${eventDescription}</td>
+            `;
+
+            // 新事件插入到最前面
+            logTableBody.insertBefore(row, logTableBody.firstChild);
+
+            // 限制日誌數量 (最多保留 20 條)
+            if (logTableBody.children.length > 20) {
+                logTableBody.removeChild(logTableBody.lastChild);
+            }
+        }
+
+        // ===== 遠端控制功能 =====
+        async function sendMotorCommand(action) {
+            if (!arduinoIP) {
+                throw new Error('請先輸入 Arduino IP 並連線');
+            }
+
+            const apiUrl = `http://${arduinoIP}/api/control/motor?action=${action}`;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            return response.json();
+        }
+
+        // 處理風扇開關切換
+        fanToggle.addEventListener('change', async () => {
+            const isOn = fanToggle.checked;
+            const action = isOn ? 'on' : 'off';
+            const actionText = isOn ? '開啟' : '停止';
+
+            if (!arduinoIP || !isArduinoConnected) {
+                alert('請先輸入 Arduino IP 並成功連線');
+                fanToggle.checked = !isOn;
+                return;
+            }
+
+            fanToggle.disabled = true;
+
+            try {
+                const result = await sendMotorCommand(action);
+                const manualStop = !!result.manual_stop;
+                const motorRunning = !!result.motor_running;
+                const shouldShowRunning = motorRunning && !manualStop;
+
+                fanToggle.checked = shouldShowRunning;
+                updateFanVisualState(shouldShowRunning);
+
+                if (manualStop) {
+                    addLogEntry('✅ 馬達已手動停止');
+                } else if (shouldShowRunning) {
+                    addLogEntry('✅ 馬達已啟動');
+                } else {
+                    addLogEntry('⚠️ 馬達已啟動，但因距離過近正自動停止');
+                }
+
+                // 立即刷新一次資料，確保儀表板同步
+                await fetchDistanceData();
+
+            } catch (error) {
+                console.error('馬達控制失敗:', error);
+                addLogEntry(`❌ 風扇${actionText}失敗: ${error.message}`);
+                fanToggle.checked = !isOn;
+                updateFanVisualState(!isOn);
+            } finally {
+                fanToggle.disabled = false;
+            }
+        });
+
+        // ===== Arduino 距離感測器功能 =====
+
+        /**
+         * 從 Arduino 獲取距離數據
+         */
+        async function fetchDistanceData() {
+            if (!arduinoIP || !isArduinoConnected) {
+                return;
+            }
+
+            let timeoutId = null;
+            try {
+                const apiUrl = `http://${arduinoIP}/api/data`;
+
+                // 創建 AbortController 用於超時控制
+                const controller = new AbortController();
+                timeoutId = setTimeout(() => controller.abort(), 5000);
+
+                const response = await fetch(apiUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+                timeoutId = null;
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                // 更新距離顯示（轉換為公尺）
+                if (data.valid && data.distance_m !== undefined) {
+                    const distanceM = parseFloat(data.distance_m);
+                    birdDistanceElement.textContent = distanceM.toFixed(2) + ' 公尺';
+
+                    // 判斷紅綠燈狀態
+                    if (distanceM < 0.45) { // 45cm 以內 -> 紅燈
+                        updateBirdStatus('red');
+                    } else if (distanceM < 0.60) { // 60cm 以內 -> 黃燈
+                        updateBirdStatus('yellow');
+                    } else { // 60cm 以上 -> 綠燈
+                        updateBirdStatus('green');
+                    }
+                } else {
+                    birdDistanceElement.textContent = '無訊號';
+                }
+
+                // 更新風扇狀態與開關
+                if (data.manual_stop !== undefined || data.motor_running !== undefined) {
+                    const manualStop = data.manual_stop === true || data.manual_stop === 'true';
+                    const motorRunning = data.motor_running === true || data.motor_running === 'true';
+                    const shouldShowRunning = motorRunning && !manualStop;
+
+                    const desiredToggleState = shouldShowRunning;
+                    if (fanToggle.checked !== desiredToggleState) {
+                        fanToggle.checked = desiredToggleState;
+                    }
+
+                    updateFanVisualState(shouldShowRunning);
+                    updateStatus(shouldShowRunning ? '運轉中' : '已停止', shouldShowRunning ? 'online' : 'offline');
+
+                    // 偵測手動停機狀態改變並發送通知
+                    if (lastManualStopState !== null) {
+                        // 如果之前不是手動停止，現在變成了手動停止
+                        if (!lastManualStopState && manualStop) {
+                            sendLineBroadcast('⚠️ [系統通知] 風扇已執行「手動停機」', true);
+                        }
+                    }
+                    lastManualStopState = manualStop;
+                }
+
+                // 更新連線狀態
+                updateArduinoStatus('已連線', 'online');
+
+            } catch (error) {
+                console.error('獲取距離數據失敗:', error);
+
+                // 清理超時計時器（如果還在運行）
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                }
+
+                updateArduinoStatus('連線錯誤', 'offline');
+                birdDistanceElement.textContent = '-- 公尺';
+
+                // 提供更詳細的錯誤信息
+                let errorMsg = '⚠️ Arduino 連線失敗: ';
+                if (error.name === 'AbortError') {
+                    errorMsg += '連線超時（超過 5 秒）';
+                } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    errorMsg += '無法連接到 Arduino';
+                } else if (error.message.includes('404')) {
+                    errorMsg += 'API 端點不存在，請確認 Arduino 程式已正確上傳';
+                } else {
+                    errorMsg += error.message;
+                }
+
+                // 避免重複記錄相同錯誤（每 5 秒記錄一次）
+                const now = Date.now();
+                if (now - lastErrorTime > 5000) {
+                    addLogEntry(errorMsg);
+                    lastErrorTime = now;
+                }
+            }
+        }
+
+        /**
+         * 更新 Arduino 連線狀態顯示
+         */
+        function updateArduinoStatus(status, statusClass) {
+            arduinoStatus.textContent = status;
+            arduinoStatusDot.className = `status-dot ${statusClass}`;
+        }
+
+        /**
+         * 開始輪詢 Arduino 數據
+         */
+        function startArduinoPolling() {
+            if (arduinoPollInterval) {
+                clearInterval(arduinoPollInterval);
+            }
+
+            const intervalSeconds = parseFloat(updateIntervalInput.value) || 1;
+            const intervalMs = intervalSeconds * 1000;
+
+            // 立即獲取一次數據
+            fetchDistanceData();
+
+            // 設定定期輪詢
+            arduinoPollInterval = setInterval(() => {
+                fetchDistanceData();
+            }, intervalMs);
+
+            isArduinoConnected = true;
+            connectArduinoBtn.disabled = true;
+            disconnectArduinoBtn.disabled = false;
+            arduinoIPInput.disabled = true;
+            updateIntervalInput.disabled = true;
+
+            updateArduinoStatus('已連線', 'online');
+            addLogEntry(`✅ 已連線到 Arduino (${arduinoIP})，開始接收距離數據`);
+        }
+
+        /**
+         * 停止輪詢 Arduino 數據
+         */
+        function stopArduinoPolling() {
+            if (arduinoPollInterval) {
+                clearInterval(arduinoPollInterval);
+                arduinoPollInterval = null;
+            }
+
+            isArduinoConnected = false;
+            connectArduinoBtn.disabled = false;
+            disconnectArduinoBtn.disabled = true;
+            arduinoIPInput.disabled = false;
+            updateIntervalInput.disabled = false;
+
+            updateArduinoStatus('未連線', 'offline');
+            birdDistanceElement.textContent = '-- 公尺';
+            addLogEntry('⏹️ 已斷開 Arduino 連線');
+        }
+
+        // ===== Pico 2W 連線功能 =====
+
+        /**
+         * 連接到 Pico 2W 並檢查狀態
+         */
+
+        // ===== 新增功能實作 =====
+
+        // 1. 設定模態框控制
+        settingsBtn.addEventListener('click', () => {
+            weatherApiKeyInput.value = localStorage.getItem('weatherApiKey') || '';
+            weatherCityInput.value = localStorage.getItem('weatherCity') || 'Taipei';
+            lineAccessTokenInput.value = localStorage.getItem('lineAccessToken') || '';
+            settingsModal.classList.remove('hidden');
+        });
+
+        closeSettingsBtn.addEventListener('click', () => {
+            settingsModal.classList.add('hidden');
+        });
+
+        saveSettingsBtn.addEventListener('click', () => {
+            weatherApiKey = weatherApiKeyInput.value.trim();
+            weatherCity = weatherCityInput.value.trim();
+            lineAccessToken = lineAccessTokenInput.value.trim();
+
+            localStorage.setItem('weatherApiKey', weatherApiKey);
+            localStorage.setItem('weatherCity', weatherCity);
+            localStorage.setItem('lineAccessToken', lineAccessToken);
+
+            settingsModal.classList.add('hidden');
+            addLogEntry('⚙️ 系統設定已更新');
+
+            // 立即更新天氣
+            if (weatherApiKey && weatherCity) {
+                fetchWeatherData();
+            }
+        });
+
+        // 測試 LINE 按鈕
+        document.getElementById('test-line-btn').addEventListener('click', async () => {
+            const token = lineAccessTokenInput.value.trim();
+            if (!token) {
+                alert('請先輸入 LINE Token');
+                return;
+            }
+
+            // 暫存原本的 token，使用輸入框的 token 進行測試
+            const originalToken = lineAccessToken;
+            lineAccessToken = token;
+
+            addLogEntry('🔄 正在發送測試訊息...');
+            await sendLineBroadcast('🔔 這是測試訊息：LINE 通知功能正常！', true); // true = 強制發送(無視冷卻)
+
+            lineAccessToken = originalToken;
+        });
+
+        // 初始化載入設定
+        function loadSettings() {
+            weatherApiKey = localStorage.getItem('weatherApiKey') || '';
+            weatherCity = localStorage.getItem('weatherCity') || 'Taipei';
+            lineAccessToken = localStorage.getItem('lineAccessToken') || '';
+
+            if (weatherApiKey && weatherCity) {
+                fetchWeatherData();
+                // 每 10 分鐘更新一次天氣
+                setInterval(fetchWeatherData, 600000);
+            }
+        }
+
+        // 2. OpenWeatherMap 整合
+        async function fetchWeatherData() {
+            if (!weatherApiKey || !weatherCity) return;
+
+            try {
+                const url = `https://api.openweathermap.org/data/2.5/weather?q=${weatherCity}&units=metric&lang=zh_tw&appid=${weatherApiKey}`;
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        throw new Error('API Key 無效或尚未開通 (請等待 10-15 分鐘)');
+                    } else if (response.status === 404) {
+                        throw new Error('找不到該城市');
+                    } else {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                }
+
+                const data = await response.json();
+
+                // 更新 UI
+                const temp = Math.round(data.main.temp);
+                const desc = data.weather[0].description;
+                const icon = data.weather[0].icon;
+                const windSpeed = data.wind.speed; // m/s
+
+                weatherTempEl.textContent = `${temp}°C`;
+                weatherDescEl.textContent = desc;
+                weatherWindEl.textContent = `${windSpeed} m/s`;
+                weatherIconEl.src = `http://openweathermap.org/img/wn/${icon}@2x.png`;
+
+                // 智慧決策邏輯
+                let advice = '環境正常';
+                let shouldStop = false;
+
+                if (windSpeed < 3.0) {
+                    advice = '風速過低，建議停機';
+                    // shouldStop = true; // 可選擇是否自動執行
+                } else if (windSpeed > 25.0) {
+                    advice = '⚠️ 強風警報，強制停機';
+                    shouldStop = true;
+                }
+
+                // 檢查天氣代碼 (2xx: Thunderstorm, 5xx: Rain)
+                const weatherId = data.weather[0].id;
+                if (weatherId >= 200 && weatherId < 600) {
+                    advice = '⚠️ 惡劣天氣，建議停機';
+                    // shouldStop = true;
+                }
+
+                weatherAdviceEl.textContent = advice;
+
+                // 如果需要自動停機
+                if (shouldStop && fanToggle.checked) {
+                    addLogEntry(`🛑 環境觸發：${advice}，正在停止風扇...`);
+                    // 呼叫停機函式 (模擬點擊)
+                    fanToggle.click();
+                }
+
+            } catch (error) {
+                console.error('Weather Error:', error);
+                weatherDescEl.textContent = error.message || '更新失敗';
+                // 如果是 API Key 問題，顯示更明顯的提示
+                if (error.message.includes('API Key')) {
+                    addLogEntry('⚠️ 天氣更新失敗: API Key 可能尚未開通');
+                }
+            }
+        }
+
+        // 3. LINE Messaging API (Broadcast) 整合
+        async function sendLineBroadcast(message, force = false) {
+            if (!lineAccessToken) return;
+
+            const now = Date.now();
+            if (!force && now - lastNotificationTime < NOTIFICATION_COOLDOWN) {
+                console.log('通知冷卻中...');
+                return; // 冷卻中
+            }
+
+            try {
+                // 使用 CORS Proxy
+                const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+                const lineApiUrl = 'https://api.line.me/v2/bot/message/broadcast';
+
+                const payload = {
+                    messages: [
+                        {
+                            type: "text",
+                            text: message
+                        }
+                    ]
+                };
+
+                const response = await fetch(proxyUrl + lineApiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${lineAccessToken}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    addLogEntry('📱 LINE 廣播已發送');
+                } else {
+                    console.error('LINE API Failed:', response.status);
+                    const errText = await response.text();
+                    console.error('Error details:', errText);
+
+                    let errorMsg = `⚠️ 發送失敗 (${response.status})`;
+
+                    // 嘗試解析錯誤原因
+                    if (errText.includes('See /corsdemo')) {
+                        errorMsg = '⚠️ 失敗: 請重新啟用 CORS Proxy';
+                    } else {
+                        try {
+                            const json = JSON.parse(errText);
+                            if (json.message) {
+                                errorMsg += `: ${json.message}`;
+                            }
+                        } catch (e) {
+                            // 如果不是 JSON，只顯示前 20 個字
+                            errorMsg += `: ${errText.substring(0, 20)}`;
+                        }
+                    }
+
+                    addLogEntry(errorMsg);
+                }
+                // 無論成功失敗，都更新時間，避免洗版
+                lastNotificationTime = now;
+            } catch (error) {
+                console.error('Notification Error:', error);
+            }
+        }
+
+        // 啟動時載入設定
+        loadSettings();
+
+        // 修改 fetchDistanceData 中的距離偵測邏輯，加入通知
+        const originalUpdateBirdStatus = updateBirdStatus;
+        updateBirdStatus = function (level) {
+            originalUpdateBirdStatus(level);
+            if (level === 'red') {
+                sendLineBroadcast('⚠️ [HLB 警報] 偵測到物體入侵！距離過近 (<45cm)，已執行強制停機保護。');
+            }
+        };
+        async function connectToPico2W(ip) {
+            try {
+                // 嘗試連接到 Pico 2W 的狀態端點
+                // 常見的端點：/status, /api/status, /, /health
+                const endpoints = ['/status', '/api/status', '/', '/health'];
+                let connected = false;
+
+                for (const endpoint of endpoints) {
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+                        const response = await fetch(`http://${ip}${endpoint}`, {
+                            method: 'GET',
+                            headers: {
+                                'Accept': 'application/json'
+                            },
+                            signal: controller.signal
+                        });
+
+                        clearTimeout(timeoutId);
+
+                        if (response.ok) {
+                            connected = true;
+                            updateStatus('已連線', 'online');
+                            addLogEntry(`✅ 已連線到 Pico 2W (${ip})`);
+                            break;
+                        }
+                    } catch (e) {
+                        // 繼續嘗試下一個端點
+                        continue;
+                    }
+                }
+
+                if (!connected) {
+                    // 如果所有端點都失敗，嘗試簡單的 ping（通過 fetch）
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+                        await fetch(`http://${ip}`, {
+                            method: 'GET',
+                            signal: controller.signal
+                        });
+
+                        clearTimeout(timeoutId);
+                        updateStatus('已連線', 'online');
+                        addLogEntry(`✅ 已連線到 Pico 2W (${ip})`);
+                        connected = true;
+                    } catch (e) {
+                        throw new Error('無法連接到 Pico 2W');
+                    }
+                }
+
+                return connected;
+            } catch (error) {
+                updateStatus('連線失敗', 'offline');
+                addLogEntry(`❌ Pico 2W 連線失敗: ${error.message}`);
+                throw error;
+            }
+        }
+
+        /**
+         * 開始輪詢 Pico 2W 狀態
+         */
+        function startPicoPolling(ip) {
+            if (picoPollInterval) {
+                clearInterval(picoPollInterval);
+            }
+
+            picoIP = ip;
+            isPicoConnected = true;
+
+            // 每 5 秒檢查一次連線狀態
+            picoPollInterval = setInterval(async () => {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+                    await fetch(`http://${picoIP}`, {
+                        method: 'GET',
+                        signal: controller.signal
+                    });
+
+                    clearTimeout(timeoutId);
+                    updateStatus('已連線', 'online');
+                } catch (error) {
+                    updateStatus('連線中斷', 'offline');
+                    isPicoConnected = false;
+                    if (picoPollInterval) {
+                        clearInterval(picoPollInterval);
+                        picoPollInterval = null;
+                    }
+                }
+            }, 5000);
+        }
+
+        // Arduino 連線按鈕事件
+        connectArduinoBtn.addEventListener('click', async () => {
+            arduinoIP = arduinoIPInput.value.trim();
+
+            if (!arduinoIP) {
+                alert('請輸入 IP 地址');
+                return;
+            }
+
+            // 簡單驗證 IP 格式
+            const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+            if (!ipPattern.test(arduinoIP)) {
+                alert('請輸入有效的 IP 地址格式（例如：192.168.1.100）');
+                return;
+            }
+
+            // 更新即時狀態為連線中
+            updateStatus('連線中...', 'connecting');
+            updateArduinoStatus('連線中...', 'connecting');
+            addLogEntry(`🔌 正在連線到設備: ${arduinoIP}`);
+
+            // 先嘗試連接到 Pico 2W（更新即時狀態）
+            try {
+                await connectToPico2W(arduinoIP);
+                startPicoPolling(arduinoIP);
+            } catch (error) {
+                console.log('Pico 2W 連線失敗，嘗試 Arduino 連線...');
+            }
+
+            // 然後嘗試 Arduino 連線（距離感測器）
+            try {
+                await fetchDistanceData();
+                startArduinoPolling();
+            } catch (error) {
+                updateArduinoStatus('連線失敗', 'offline');
+                addLogEntry(`❌ 設備連線失敗: ${error.message}`);
+                if (!isPicoConnected) {
+                    alert(`無法連線到設備 (${arduinoIP})\n\n請確認：\n1. 設備已連線到 WiFi\n2. IP 地址正確\n3. 在同一網路環境下`);
+                }
+            }
+        });
+
+        // Arduino 斷線按鈕事件
+        disconnectArduinoBtn.addEventListener('click', () => {
+            stopArduinoPolling();
+
+            // 同時停止 Pico 2W 輪詢
+            if (picoPollInterval) {
+                clearInterval(picoPollInterval);
+                picoPollInterval = null;
+            }
+            isPicoConnected = false;
+            picoIP = '';
+
+            // 更新即時狀態
+            updateStatus('未連線', 'offline');
+        });
+
+        // ===== 初始化 =====
+        console.log('IoT 監控儀表板已載入');
+        addLogEntry('📊 監控儀表板已啟動');
+
+        // 模擬初始化訊息 (開發用)
+        setTimeout(() => {
+            addLogEntry('⚙️ 系統初始化完成');
+        }, 1000);
+
+        // 嘗試從 URL 參數獲取 IP 地址
+        const urlParams = new URLSearchParams(window.location.search);
+        const arduinoIPParam = urlParams.get('arduino_ip') || urlParams.get('pico_ip') || urlParams.get('ip');
+        if (arduinoIPParam) {
+            arduinoIPInput.value = arduinoIPParam;
+            addLogEntry(`📱 從 URL 參數讀取 IP 地址: ${arduinoIPParam}`);
+
+            // 自動連線（可選）
+            // connectArduinoBtn.click();
+        }
+
+    </script>
+
+</body>
+
+</html>
