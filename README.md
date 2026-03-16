@@ -18,10 +18,9 @@ An Edge AI &amp; IoT based active bird deterrent system for wind turbines.
 
 本專案整合了硬體控制、邊緣 AI 模型與 Web 平台，程式碼目錄結構如下：
 
-* `/Hardware_Edge/`：包含 Raspberry Pi Pico 2W 的控制邏輯、超聲波感測與蜂鳴器硬體作動程式碼 (C/C++ / MicroPython)。
-* `/AI_Model/`：包含 YOLO v4-Tiny 模型訓練腳本、量化轉換設定，以及 RTL8735B 的視覺推論邏輯。
-* `/Web_Dashboard/`：包含後台伺服器、前端戰情室網頁與 LINE Notify 串接 API 程式碼 (Python/FastAPI / HTML/JS)。
-* `/Docs/`：系統架構圖與專案相關說明文件。
+* `/final/`：Raspberry Pi Pico 2W 的控制邏輯，包含超聲波測距、蜂鳴器驅離與 MQTT 通訊。
+* `/ObjectDetectionCallback-final/`：RTL8735B (AmebaPro2) 的邊緣 AI 推論程式，包含 YOLO 物件偵測回呼與目標分類清單。
+* `dashboard.html`：前端戰情室網頁，整合即時 MQTT 資料、天氣 API 與 LINE Notify 推播。
 
 ## 🛠️ 開發環境與硬體設備
 
